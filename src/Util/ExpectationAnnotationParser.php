@@ -53,14 +53,19 @@ class ExpectationAnnotationParser
     public function parseExpectation(string $expectationAnnotation): string
     {
         $matches = [];
-        $expectationRegex = '/\(?\"?(?<filePath>[a-zA-Z0-9_\\/]+)(.json)?\"?\)?/';
+        $expectationRegex = '/\(?\"?(?<filePath>[a-zA-Z0-9_\\/]+)(.php|.json)?\"?\)?/';
         preg_match($expectationRegex, $expectationAnnotation, $matches);
 
         if (empty($matches)) {
             throw new ParseException("The 'expectation' annotation could not be parsed (found: '$expectationAnnotation')");
         }
 
-        $expectationPath = $this->getExpectationFullPath("{$matches['filePath']}.json");
+        $expectationPath = $this->getExpectationFullPath(
+            isset($matches[2])
+                ? $matches['filePath'] . $matches[2]
+                : "{$matches['filePath']}.json"
+        );
+
         if (!file_exists($expectationPath)) {
             throw new ParseException("The expectation at $expectationPath could not be found ");
         }

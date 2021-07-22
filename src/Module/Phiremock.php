@@ -33,25 +33,16 @@ use Mcustiel\Phiremock\Codeception\Util\ExpectationAnnotationParser;
 use Mcustiel\Phiremock\Domain\Expectation;
 use Psr\Http\Client\ClientExceptionInterface;
 
-class Phiremock extends CodeceptionModule
+final class Phiremock extends CodeceptionModule
 {
-    /** @var array */
     protected $config = Config::DEFAULT_CONFIG;
-
-    /** @var \Mcustiel\Phiremock\Client\Phiremock */
-    private $phiremock;
-
-    /** @var ExpectationAnnotationParser */
-    private $expectationsParser;
-
-    /** @var Config */
-    private $moduleConfig;
+    private ?\Mcustiel\Phiremock\Client\Phiremock $phiremock = null;
+    private ExpectationAnnotationParser $expectationsParser;
+    private Config $moduleConfig;
+    private bool $isExtraConfig;
 
     /** @var Phiremock[] */
-    private $extraConnections = [];
-
-    /** @var bool */
-    private $isExtraConfig;
+    private array $extraConnections = [];
 
     /** @throws ModuleException */
     public function __construct(ModuleContainer $moduleContainer, $config = null, bool $isExtra = false)
@@ -75,7 +66,7 @@ class Phiremock extends CodeceptionModule
         $this->phiremock = $this->moduleConfig->getClientFactory()->createPhiremockClient(
             $this->moduleConfig->getHost(),
             $this->moduleConfig->getPort(),
-            new Scheme($this->moduleConfig->isSecure() ? Scheme::HTTPS: Scheme::HTTP)
+            new Scheme($this->moduleConfig->isSecure() ? Scheme::HTTPS : Scheme::HTTP)
         );
         $this->expectationsParser = new ExpectationAnnotationParser(
             $this->moduleConfig->getExpectationsPath()
@@ -135,8 +126,8 @@ class Phiremock extends CodeceptionModule
     }
 
     /**
-     * @deprecated Name is confusing, sounds like an assertion
      * @throws ClientExceptionInterface
+     * @deprecated Name is confusing, sounds like an assertion
      */
     public function didNotReceiveRequestsInRemoteService(): void
     {
@@ -220,9 +211,11 @@ class Phiremock extends CodeceptionModule
             $expectations = $this->expectationsParser->getExpectations($test);
             if (!empty($expectations)) {
                 foreach ($expectations as $expectation) {
-                    $this->phiremock->createExpectationFromJson(
-                        file_get_contents($expectation)
-                    );
+                    $pathinfo = pathinfo($expectation, PATHINFO_EXTENSION);
+                    $content = $pathinfo === 'php'
+                        ? json_encode(require $expectation)
+                        : file_get_contents($expectation);
+                    $this->phiremock->createExpectationFromJson($content);
                 }
             }
         } catch (ParseException $exception) {

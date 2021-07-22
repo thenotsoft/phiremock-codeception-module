@@ -1,44 +1,35 @@
 <?php
 
+declare(strict_types=1);
+
 use Codeception\Configuration;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
 use Mcustiel\Phiremock\Client\Phiremock;
-use function Mcustiel\Phiremock\Client\postRequest;
-use function Mcustiel\Phiremock\Client\respond;
 use Mcustiel\Phiremock\Client\Utils\A;
 use Mcustiel\Phiremock\Client\Utils\Is;
 use Mcustiel\Phiremock\Client\Utils\Respond;
 
-class BasicTestCest
-{
-    /** @var Client */
-    private $guzzle;
+use function Mcustiel\Phiremock\Client\postRequest;
+use function Mcustiel\Phiremock\Client\respond;
 
-    /** @var Client */
-    private $guzzleSecure;
+final class BasicTestCest
+{
+    private Client $guzzle;
 
     public function _before(AcceptanceTester $I)
     {
         $this->guzzle = new Client(
             [
-                'base_uri'    => 'http://localhost:18080',
+                'base_uri' => 'http://localhost:18080',
                 'http_errors' => false
             ]
         );
-//         $this->guzzleSecure = new Client(
-//             [
-//                 'base_uri'    => 'https://localhost:18081',
-//                 'http_errors' => false,
-//                 'verify'      => false,
-//             ]
-//         );
     }
 
-    public function severalExceptatationsInOneTest(AcceptanceTester $I)
+    public function severalExceptatationsInOneTest(AcceptanceTester $I): void
     {
         $this->executeBaseTest($I, $I->takeConnection('default'));
-        // $this->executeBaseTest($I, $I->takeConnection('secure'));
     }
 
     public function shouldSetTheScenarioState(AcceptanceTester $I): void
@@ -57,7 +48,7 @@ class BasicTestCest
         $I->setScenarioState('tomatoScenario', 'potatoState');
         $response = $this->guzzle->get('/potato');
         $I->assertSame(203, $response->getStatusCode());
-        $I->assertSame('I am a potato', (string) $response->getBody());
+        $I->assertSame('I am a potato', (string)$response->getBody());
     }
 
     public function shouldCreateAnExpectationWithBinaryResponseTest(AcceptanceTester $I)
@@ -71,7 +62,7 @@ class BasicTestCest
             )
         );
 
-        $responseBody = (string) $this->guzzle->get('/show-me-the-video')->getBody();
+        $responseBody = (string)$this->guzzle->get('/show-me-the-video')->getBody();
         $I->assertEquals($responseContents, $responseBody);
     }
 
@@ -96,9 +87,9 @@ class BasicTestCest
         $I->assertEquals('POST', $first->method);
         $I->assertEquals('a=b', $first->body);
 
-        $headers = (array) $first->headers;
+        $headers = (array)$first->headers;
         $expectedSubset = [
-            'Host'         => ['localhost:18080'],
+            'Host' => ['localhost:18080'],
             'Content-Type' => ['application/x-www-form-urlencoded']
         ];
 
@@ -109,13 +100,12 @@ class BasicTestCest
     }
 
     /**
-     * @param AcceptanceTester $I
      * @expectation("test_first_get")
      */
-    public function testAnnotationExpectationIsLoaded(AcceptanceTester $I)
+    public function testAnnotationExpectationIsLoaded(AcceptanceTester $I): void
     {
         $requestBuilder = A::getRequest()->andUrl(Is::equalTo('/expectation/1'));
-        $response = (string) $this->guzzle->get('/expectation/1')->getBody();
+        $response = (string)$this->guzzle->get('/expectation/1')->getBody();
 
         $requests = $I->grabRequestsMadeToRemoteService($requestBuilder);
         $I->assertCount(1, $requests);
@@ -124,44 +114,37 @@ class BasicTestCest
     }
 
     /**
-     * @param AcceptanceTester $I
      * @expectation("test_first_get")
      * @expectation("test_second_get")
+     * @expectation("test_first_get.php")
      */
-    public function testMultipleAnnotationsAreLoaded(AcceptanceTester $I)
+    public function testMultipleAnnotationsAreLoaded(AcceptanceTester $I): void
     {
-        $requestBuilder = A::getRequest()->andUrl(Is::matching('/\\/expectation\\/\\d+/'));
+        $requestBuilder = A::getRequest()->andUrl(Is::matching('/\\/expectation\\/(php\\/)?\\d+/'));
         $this->guzzle->get('/expectation/1');
         $this->guzzle->get('/expectation/2');
+        $this->guzzle->get('/expectation/php/1');
+        $this->guzzle->get('/expectation/php/2');
+
         $requests = $I->grabRequestsMadeToRemoteService($requestBuilder);
-        $I->assertCount(2, $requests);
+        $I->assertCount(4, $requests);
     }
 
     /**
-     * @param AcceptanceTester $I
      * @expectation("subdirectory/test_first_get")
+     * @expectation("subdirectory/test_first_get.php")
      */
-    public function testAnnotationInSubdirectoryIsLoaded(AcceptanceTester $I)
+    public function testAnnotationInSubdirectoryIsLoaded(AcceptanceTester $I): void
     {
         $conditionsBuilder = A::getRequest();
-        $requestBuilder = $conditionsBuilder->andMethod(Is::equalTo('GET'))->andUrl(Is::equalTo('/expectation/subdirectory'));
-        $responseBody = (string) $this->guzzle->get('/expectation/subdirectory')->getBody();
-        $I->assertSame('response', $responseBody);
-        $requests = $I->grabRequestsMadeToRemoteService($requestBuilder);
-        $I->assertCount(1, $requests);
-    }
+        $requestBuilder = $conditionsBuilder->andMethod(Is::equalTo('GET'))->andUrl(Is::matching('/\\/expectation\\/subdirectory(\\/php)?/'));
+        $responseBody = (string)$this->guzzle->get('/expectation/subdirectory')->getBody();
+        $responseBodyPhp = (string)$this->guzzle->get('/expectation/subdirectory/php')->getBody();
 
-    /**
-     * @param AcceptanceTester $I
-     *
-     * @expectation test_first_get
-     * @expectation test_first_get.json
-     * @expectation(test_first_get.json)
-     * @expectation(test_first_get)
-     * @expectation("test_first_get")
-     */
-    public function testAnnotationFormats(AcceptanceTester $I)
-    {
+        $I->assertSame('response', $responseBody);
+        $I->assertSame('response php', $responseBodyPhp);
+        $requests = $I->grabRequestsMadeToRemoteService($requestBuilder);
+        $I->assertCount(2, $requests);
     }
 
     private function executeBaseTest(AcceptanceTester $I, \Codeception\Module\Phiremock $module): void
@@ -195,7 +178,7 @@ class BasicTestCest
             )
         );
         foreach (['potato', 'tomato', 'banana', 'coconut'] as $item) {
-            $response = (string) $this->guzzle->get("/{$item}")->getBody();
+            $response = (string)$this->guzzle->get("/{$item}")->getBody();
             $I->assertEquals('I am a ' . $item, $response);
         }
         $I->seeRemoteServiceReceived(4, A::getRequest());
