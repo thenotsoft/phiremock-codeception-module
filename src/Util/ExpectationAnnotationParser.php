@@ -26,8 +26,7 @@ use Codeception\Util\Annotation;
 
 class ExpectationAnnotationParser
 {
-    /** @var string */
-    private $expectationsPath;
+    private string $expectationsPath;
 
     public function __construct(string $expectationsPath)
     {
@@ -53,21 +52,22 @@ class ExpectationAnnotationParser
     public function parseExpectation(string $expectationAnnotation): string
     {
         $matches = [];
-        $expectationRegex = '/\(?\"?(?<filePath>[a-zA-Z0-9_\\/]+)(.php|.json)?\"?\)?/';
+        $expectationRegex = '/\(?\"?(?<filePath>[a-zA-Z0-9\-_.\\/]+)(.php|.json)?\"?\)?/';
         preg_match($expectationRegex, $expectationAnnotation, $matches);
 
         if (empty($matches)) {
-            throw new ParseException("The 'expectation' annotation could not be parsed (found: '$expectationAnnotation')");
+            throw new ParseException("The 'expectation' annotation could not be parsed (found: '$expectationAnnotation').");
         }
 
+        $extension = pathinfo($matches['filePath'], PATHINFO_EXTENSION);
         $expectationPath = $this->getExpectationFullPath(
-            isset($matches[2])
-                ? $matches['filePath'] . $matches[2]
+            $extension !== ''
+                ? $matches['filePath']
                 : "{$matches['filePath']}.json"
         );
 
         if (!file_exists($expectationPath)) {
-            throw new ParseException("The expectation at $expectationPath could not be found ");
+            throw new ParseException("The expectation at $expectationPath could not be found.");
         }
 
         return $expectationPath;
